@@ -651,7 +651,9 @@ $("wList").onclick = async e => {
 // STEPS (typed in, or sent from Apple Health by an iPhone Shortcut)
 // =====================================================================
 const atMs = v => v && v.at ? (new Date(v.at).getTime() || 0) : 0;
-const stepsOn = d => S.steps[d] ? Math.round(num(S.steps[d].n)) : 0;
+// The Shortcut may send "6843", "6,843" or "6843 steps"; keep just the number.
+const stepNum = v => typeof v === "number" ? v : num(String(v ?? "").replace(/[^0-9.]/g, ""));
+const stepsOn = d => S.steps[d] ? Math.round(stepNum(S.steps[d].n)) : 0;
 function renderSteps() {
   const d = S.day, goal = num(S.set.steps) || 10000, n = stepsOn(d), rec = S.steps[d];
   $("stepNow").textContent = fmt(n);
