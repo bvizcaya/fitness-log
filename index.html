@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Fitness Log</title>
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Fitness">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<script>
+  // Apply the saved Appearance choice before the page paints (no flash).
+  try { const t = localStorage.getItem("fit.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<style>
+/* Same iOS-style system as Household Ledger: grouped background, inset rounded cards, SF type, frosted tab bar. */
+:root{
+  --bg:#F2F2F7; --surface:#FFFFFF; --surface2:#FFFFFF; --sunk:rgba(118,118,128,.12);
+  --ink:#000000; --muted:rgba(60,60,67,.6); --faint:rgba(60,60,67,.3); --line:rgba(60,60,67,.18);
+  --accent:#5856D6; --accent-ink:#FFFFFF; --accent-soft:rgba(88,86,214,.13);
+  --good:#34C759; --good-ink:#248A3D; --warn:#FF9500; --warn-ink:#C93400; --bad:#FF3B30;
+  --pro:#FF2D55; --carb:#FF9500; --fat:#30B0C7;
+  --bar:rgba(249,249,249,.82); --hud:rgba(30,30,30,.86); --hud-ink:#FFFFFF;
+  --sf:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
+  --sf-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",system-ui,sans-serif;
+  --sf-rounded:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --radius:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#000000; --surface:#1C1C1E; --surface2:#2C2C2E; --sunk:rgba(118,118,128,.24);
+  --ink:#FFFFFF; --muted:rgba(235,235,245,.6); --faint:rgba(235,235,245,.3); --line:rgba(84,84,88,.6);
+  --accent:#7D7AFF; --accent-ink:#FFFFFF; --accent-soft:rgba(125,122,255,.2);
+  --good:#30D158; --good-ink:#30D158; --warn:#FF9F0A; --warn-ink:#FF9F0A; --bad:#FF453A;
+  --pro:#FF375F; --carb:#FF9F0A; --fat:#40C8E0;
+  --bar:rgba(22,22,24,.8); --hud:rgba(58,58,60,.9); --hud-ink:#FFFFFF; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#000000; --surface:#1C1C1E; --surface2:#2C2C2E; --sunk:rgba(118,118,128,.24);
+  --ink:#FFFFFF; --muted:rgba(235,235,245,.6); --faint:rgba(235,235,245,.3); --line:rgba(84,84,88,.6);
+  --accent:#7D7AFF; --accent-ink:#FFFFFF; --accent-soft:rgba(125,122,255,.2);
+  --good:#30D158; --good-ink:#30D158; --warn:#FF9F0A; --warn-ink:#FF9F0A; --bad:#FF453A;
+  --pro:#FF375F; --carb:#FF9F0A; --fat:#40C8E0;
+  --bar:rgba(22,22,24,.8); --hud:rgba(58,58,60,.9); --hud-ink:#FFFFFF; color-scheme:dark}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%;background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sf);font-size:17px;line-height:1.35;letter-spacing:-.01em;padding-top:env(safe-area-inset-top,0px);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px calc(110px + env(safe-area-inset-bottom,0px))}
+.num{font-variant-numeric:tabular-nums}
+
+/* Large title header */
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding-block:28px 14px}
+h1{font-family:var(--sf-display);font-weight:700;font-size:34px;letter-spacing:.01em;margin:0;line-height:1.1}
+h2{font-family:var(--sf-display);font-weight:600;font-size:20px;letter-spacing:-.01em;margin:0;text-wrap:balance}
+h3{font-size:13px;font-weight:600;color:var(--muted);margin:0;text-transform:uppercase;letter-spacing:.03em}
+.eyebrow{font-size:13px;font-weight:400;color:var(--muted);letter-spacing:-.005em}
+.badge{display:inline-grid;place-items:center;width:36px;height:36px;border-radius:50%;background:linear-gradient(180deg,#A2A2A7,#848489);color:#fff;font-weight:600;font-size:14px;letter-spacing:.02em;flex:none;text-transform:uppercase}
+
+/* Bottom tab bar */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:15;display:grid;grid-template-columns:repeat(4,1fr);
+  padding:6px max(8px,env(safe-area-inset-left,0px)) calc(4px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-right,0px));
+  background:var(--bar);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--line)}
+nav.tabs button{display:flex;flex-direction:column;align-items:center;gap:2px;font:500 10px var(--sf);letter-spacing:.01em;color:var(--muted);background:none;border:0;padding:4px 0 6px;cursor:pointer;max-width:120px;justify-self:center;width:100%}
+nav.tabs button svg{width:26px;height:26px}
+nav.tabs button[aria-selected="true"]{color:var(--accent)}
+
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--accent-soft);outline-offset:1px}
+
+/* Sections */
+section.panel{display:flex;flex-direction:column;gap:22px}
+.card{background:var(--surface);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.between{justify-content:space-between}
+.muted{color:var(--muted)} .small{font-size:15px}
+.small.muted,.foot{font-size:13px;color:var(--muted);line-height:1.4}
+
+/* Hero numbers (SF Rounded, like Fitness & Health) */
+.big{font-family:var(--sf-rounded);font-weight:700;font-size:44px;letter-spacing:-.01em;line-height:1;font-variant-numeric:tabular-nums}
+.big small{font-size:20px;font-weight:600;color:var(--muted);margin-left:4px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--sunk);border-radius:12px;padding:10px 12px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.stat b{font-family:var(--sf-rounded);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;order:2}
+.stat span{font-size:12px;color:var(--muted);order:1}
+
+.bar{height:8px;background:var(--sunk);border-radius:99px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+
+/* Calorie ring + macros */
+.dash{display:grid;grid-template-columns:132px 1fr;gap:18px;align-items:center}
+.ring{position:relative;width:132px;height:132px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring circle{fill:none;stroke-width:13;stroke-linecap:round}
+.ring .track{stroke:var(--sunk)}
+.ring .fill{stroke:var(--accent);transition:stroke-dashoffset .6s cubic-bezier(.2,.8,.2,1)}
+.ring.over .fill{stroke:var(--bad)}
+.ring .mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.ring .mid b{font-family:var(--sf-rounded);font-size:28px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.ring .mid span{font-size:12px;color:var(--muted);margin-top:3px}
+.macros{display:flex;flex-direction:column;gap:11px;min-width:0}
+.macro .row{gap:6px;flex-wrap:nowrap;font-size:15px}
+.macro .row b{font-weight:600}
+.macro .row .muted{margin-left:auto;font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.macro .bar{height:7px;margin-top:5px}
+.macro.p .bar i{background:var(--pro)} .macro.c .bar i{background:var(--carb)} .macro.f .bar i{background:var(--fat)}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
+.dot.p{background:var(--pro)} .dot.c{background:var(--carb)} .dot.f{background:var(--fat)}
+
+/* Status capsules */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;font-size:13px;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.good{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good-ink)}
+.pill.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn-ink)}
+.pill.bad{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.pill.accent{background:var(--accent-soft);color:var(--accent)}
+
+/* Inset grouped list rows */
+ul.list{list-style:none;margin:0 -16px;padding:0;display:flex;flex-direction:column}
+ul.list li{display:flex;align-items:center;gap:12px;padding:12px 16px;position:relative;min-width:0}
+ul.list li+li::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--line)}
+ul.list .grow{flex:1;min-width:0}
+ul.list .grow > div:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ul.list li.empty{margin:0 16px}
+ul.list li.tap{cursor:pointer}
+ul.list li.tap:active{background:var(--sunk)}
+.amt{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sub{font-size:13px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.meal + .meal{margin-top:4px}
+.mealhead{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0 2px}
+
+/* Forms: iOS fields */
+form.add{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+form.add .full,.full{grid-column:1/-1}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:400;color:var(--muted);min-width:0}
+input,select,textarea{font:400 17px var(--sf);color:var(--ink);background:var(--sunk);border:0;border-radius:10px;padding:11px 12px;width:100%;min-width:0;-webkit-appearance:none;appearance:none;min-height:44px}
+textarea{resize:vertical;min-height:64px}
+input::placeholder,textarea::placeholder{color:var(--faint)}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238E8E93' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+input[type="date"]{min-height:44px}
+input[type="checkbox"]{width:22px;height:22px;min-height:0;padding:0;border-radius:6px;background:var(--sunk);display:inline-grid;place-items:center;flex:none;cursor:pointer}
+input[type="checkbox"]:checked{background:var(--accent)}
+input[type="checkbox"]:checked::after{content:"";width:6px;height:11px;border:solid #fff;border-width:0 2.4px 2.4px 0;transform:translateY(-1px) rotate(45deg)}
+label.check{display:flex;align-items:center;gap:10px;font-size:15px;cursor:pointer}
+
+/* Buttons */
+button.primary{font:600 17px var(--sf);background:var(--accent);color:var(--accent-ink);border:0;border-radius:12px;padding:13px 16px;min-height:50px;cursor:pointer;transition:opacity .15s}
+button.primary:active{opacity:.7}
+button.primary:disabled{opacity:.4}
+button.ghost{font:500 15px var(--sf);background:var(--sunk);color:var(--accent);border:0;border-radius:99px;padding:7px 14px;cursor:pointer;min-height:34px;white-space:nowrap}
+button.ghost:active{opacity:.6}
+button.x{background:transparent;border:0;color:var(--faint);font-size:22px;line-height:1;padding:6px 8px;cursor:pointer;border-radius:8px;flex:none}
+button.plus{width:32px;height:32px;border-radius:50%;border:0;background:var(--accent-soft);color:var(--accent);font-size:22px;line-height:1;cursor:pointer;flex:none;display:grid;place-items:center;padding:0}
+button.destructive{color:var(--bad)}
+
+/* Day / month switcher */
+.monthnav{display:flex;align-items:center;gap:4px;background:var(--sunk);border-radius:99px;padding:2px}
+.monthnav button.ghost{background:transparent;padding:4px 10px;font-size:20px;line-height:1;min-height:30px}
+.monthnav b{min-width:112px;text-align:center;font-size:15px;font-weight:600}
+
+.empty{padding:18px;border-radius:12px;background:var(--sunk);color:var(--muted);font-size:15px;text-align:center;list-style:none}
+svg.chart{display:block;width:100%;height:auto;overflow:visible}
+svg.chart text{fill:var(--muted);font:19px var(--sf)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;background:var(--accent)}
+
+/* Food suggestions */
+.suggest{display:flex;flex-direction:column;background:var(--sunk);border-radius:12px;overflow:hidden}
+.suggest button{display:flex;justify-content:space-between;gap:10px;align-items:center;text-align:left;font:400 16px var(--sf);color:var(--ink);background:transparent;border:0;padding:11px 12px;cursor:pointer;min-height:44px}
+.suggest button + button{border-top:.5px solid var(--line)}
+.suggest button span:last-child{font-size:13px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* Workout builder */
+.ex{background:var(--sunk);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.ex input{background:var(--surface)}
+.ex .hint{font-size:13px;color:var(--accent);min-height:0}
+.setrow{display:grid;grid-template-columns:28px 1fr 1fr 32px;gap:8px;align-items:center}
+.setrow .n{font-size:13px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
+.setrow input{padding:8px 10px;min-height:38px;font-size:16px;text-align:center}
+.sethead{display:grid;grid-template-columns:28px 1fr 1fr 32px;gap:8px;font-size:12px;color:var(--muted);text-align:center}
+details.wo{border-radius:12px;background:var(--sunk);padding:0}
+details.wo summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:12px;align-items:center}
+details.wo summary::-webkit-details-marker{display:none}
+details.wo summary .grow{flex:1;min-width:0}
+details.wo summary .chev{color:var(--faint);transition:transform .2s;flex:none}
+details.wo[open] summary .chev{transform:rotate(90deg)}
+details.wo .body{padding:0 14px 14px;display:flex;flex-direction:column;gap:10px;font-size:15px}
+details.wo .body table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+details.wo .body td{padding:4px 0;vertical-align:top}
+details.wo .body td:last-child{text-align:right;color:var(--muted)}
+.wolist{display:flex;flex-direction:column;gap:10px}
+.weekhead{font-size:13px;color:var(--muted);font-weight:600;margin:6px 2px 0}
+.icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex:none;background:var(--accent-soft);color:var(--accent)}
+.icon svg{width:20px;height:20px}
+.icon.cardio{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good-ink)}
+
+/* HUD toast */
+.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--hud);color:var(--hud-ink);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);padding:11px 18px;border-radius:99px;font-weight:600;font-size:15px;z-index:20;max-width:90vw;box-shadow:0 8px 30px rgba(0,0,0,.18);animation:pop .25s cubic-bezier(.2,.8,.2,1)}
+@keyframes pop{from{opacity:0;transform:translate(-50%,8px) scale(.96)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+.notice{background:var(--accent-soft);border-radius:12px;padding:12px 14px;font-size:15px}
+
+/* Segmented control */
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:var(--sunk);border-radius:10px;padding:2px;gap:2px}
+.seg button{font:500 15px var(--sf);border:0;background:transparent;color:var(--ink);border-radius:8px;padding:7px 0;cursor:pointer;min-height:34px}
+.seg button[aria-pressed="true"]{background:var(--surface2);font-weight:600;box-shadow:0 3px 8px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04)}
+.seg.small button{font-size:13px;min-height:28px;padding:4px 0}
+
+/* Login */
+.loginwrap{min-height:100%;display:flex;align-items:center;justify-content:center}
+.login{width:100%;max-width:380px;display:flex;flex-direction:column;gap:22px;padding-block:9vh 40px}
+.appicon{width:76px;height:76px;border-radius:18px;background:linear-gradient(160deg,#7D7AFF,#4B48C9);display:grid;place-items:center;box-shadow:0 10px 24px rgba(88,86,214,.3);margin:0 auto}
+.appicon svg{width:42px;height:42px}
+.login h1{text-align:center}
+.login .eyebrow{text-align:center}
+.err{color:var(--bad);font-size:15px;font-weight:500}
+button.link{background:none;border:0;color:var(--accent);font:400 15px var(--sf);cursor:pointer;padding:4px}
+
+@media (max-width:420px){.stat{padding:9px 10px}.stat b{font-size:17px}.stat span{font-size:11px}.big{font-size:40px}
+  .dash{grid-template-columns:112px 1fr;gap:14px}.ring{width:112px;height:112px}.ring .mid b{font-size:24px}}
+@media (prefers-reduced-motion:reduce){.bar i,.ring .fill{transition:none}.toast{animation:none}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="wrap loginwrap" id="loginView" hidden>
+  <form class="login" id="loginForm">
+    <div class="appicon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6.7 6v12M17.3 6v12M3.6 9v6M20.4 9v6M6.7 12h10.6"/></svg></div>
+    <div><h1>Fitness Log</h1><div class="eyebrow" style="margin-top:6px">Workouts, weight and macros</div></div>
+    <div class="card">
+      <input id="email" type="email" autocomplete="username" placeholder="Email" aria-label="Email" required autocapitalize="off">
+      <input id="pw" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required>
+      <div class="err" id="loginErr" hidden></div>
+      <button class="primary" type="submit" id="loginBtn">Sign In</button>
+    </div>
+    <div style="text-align:center"><button class="link" type="button" id="forgot">Forgot password?</button></div>
+  </form>
+</div>
+
+<!-- APP -->
+<div class="wrap" id="appView" hidden>
+  <header class="top">
+    <div><div class="eyebrow" id="greet">Fitness Log</div><h1 id="pageTitle">Today</h1></div>
+    <span class="badge" id="meBadge">—</span>
+  </header>
+
+  <!-- TODAY (food) -->
+  <section class="panel" id="tab-today" hidden>
+    <div class="card">
+      <div class="row between">
+        <h2>Calories</h2>
+        <div class="monthnav"><button class="ghost" data-day="-1" aria-label="Previous day">‹</button><b id="dayDate" class="num"></b><button class="ghost" data-day="1" aria-label="Next day">›</button></div>
+      </div>
+      <div class="dash">
+        <div class="ring" id="calRing">
+          <svg viewBox="0 0 132 132" aria-hidden="true"><circle class="track" cx="66" cy="66" r="56"/><circle class="fill" id="calArc" cx="66" cy="66" r="56" stroke-dasharray="351.86" stroke-dashoffset="351.86"/></svg>
+          <div class="mid"><b id="calLeft">—</b><span id="calLeftLabel">cal left</span></div>
+        </div>
+        <div class="macros">
+          <div class="macro p"><div class="row"><span class="dot p"></span><b>Protein</b><span class="muted" id="mP">0 / 0g</span></div><div class="bar"><i id="mPBar" style="width:0%"></i></div></div>
+          <div class="macro c"><div class="row"><span class="dot c"></span><b>Carbs</b><span class="muted" id="mC">0 / 0g</span></div><div class="bar"><i id="mCBar" style="width:0%"></i></div></div>
+          <div class="macro f"><div class="row"><span class="dot f"></span><b>Fat</b><span class="muted" id="mF">0 / 0g</span></div><div class="bar"><i id="mFBar" style="width:0%"></i></div></div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="calEaten">0</b><span>Eaten</span></div>
+        <div class="stat"><b id="calGoal">—</b><span>Goal</span></div>
+        <div class="stat"><b id="calBurn">0</b><span>Burned (workouts)</span></div>
+      </div>
+    </div>
+
+    <div class="card" id="stepsCard">
+      <div class="row between"><h2>Steps</h2><span class="pill" id="stepSrc">—</span></div>
+      <div class="row between" style="align-items:flex-end;flex-wrap:nowrap">
+        <div class="big" id="stepNow">0</div>
+        <div class="foot" id="stepGoalText" style="text-align:right"></div>
+      </div>
+      <div class="bar"><i id="stepBar" style="width:0%;background:var(--good)"></i></div>
+      <svg class="chart" id="stepChart" viewBox="0 0 600 124" role="img" aria-label="Steps each day for the last 7 days"></svg>
+      <div class="stats">
+        <div class="stat"><b id="stepAvg">—</b><span>7-day avg</span></div>
+        <div class="stat"><b id="stepHit">—</b><span>Goal days</span></div>
+        <div class="stat"><b id="stepBest">—</b><span>Best day</span></div>
+      </div>
+      <form class="row" id="stepForm" style="flex-wrap:nowrap">
+        <input id="stepIn" type="number" min="0" step="1" inputmode="numeric" placeholder="Enter steps for this day" aria-label="Steps" style="flex:1">
+        <button class="ghost" type="submit">Save</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="row between"><h2>Food</h2><button class="ghost" type="button" id="copyYesterday">Copy Yesterday</button></div>
+      <div id="mealList"></div>
+    </div>
+
+    <div class="card" id="foodCard">
+      <h2 id="foodFormTitle">Add food</h2>
+      <div class="seg" id="mealSeg" role="group" aria-label="Meal">
+        <button type="button" data-meal="Breakfast" aria-pressed="false">Breakfast</button>
+        <button type="button" data-meal="Lunch" aria-pressed="false">Lunch</button>
+        <button type="button" data-meal="Dinner" aria-pressed="false">Dinner</button>
+        <button type="button" data-meal="Snack" aria-pressed="false">Snack</button>
+      </div>
+      <form class="add" id="foodForm" autocomplete="off">
+        <label class="f full" for="fName">Food<input id="fName" type="text" maxlength="80" placeholder="Search My Foods or type a new one" required></label>
+        <div class="suggest full" id="fSuggest" hidden></div>
+        <label class="f" for="fQty">Servings<input id="fQty" type="number" min="0" step="0.25" inputmode="decimal" value="1" required></label>
+        <label class="f" for="fCal">Calories (per serving)<input id="fCal" type="number" min="0" step="1" inputmode="decimal" placeholder="Auto"></label>
+        <div class="g4 full" style="grid-template-columns:repeat(3,1fr)">
+          <label class="f" for="fP">Protein g<input id="fP" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0"></label>
+          <label class="f" for="fC">Carbs g<input id="fC" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0"></label>
+          <label class="f" for="fF">Fat g<input id="fF" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0"></label>
+        </div>
+        <label class="check full"><input type="checkbox" id="fSave" checked>Save to My Foods for next time</label>
+        <button class="primary full" type="submit" id="fSubmit">Add to Breakfast</button>
+        <button class="ghost full" type="button" id="fCancel" hidden>Cancel Editing</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="row between"><h2>My Foods</h2><span class="foot" id="libCount"></span></div>
+      <input id="libSearch" type="search" placeholder="Search" aria-label="Search My Foods">
+      <ul class="list" id="libList"></ul>
+      <div class="foot">Tap + to add one serving to the meal picked above.</div>
+    </div>
+
+    <div class="card">
+      <h2>Last 7 days</h2>
+      <svg class="chart" id="weekChart" viewBox="0 0 600 170" role="img" aria-label="Calories eaten each day for the last 7 days"></svg>
+      <div class="stats">
+        <div class="stat"><b id="avgCal">—</b><span>Avg calories</span></div>
+        <div class="stat"><b id="avgP">—</b><span>Avg protein</span></div>
+        <div class="stat"><b id="daysOn">—</b><span>Days on target</span></div>
+      </div>
+      <div class="foot">"On target" means within 10% of your calorie goal.</div>
+    </div>
+  </section>
+
+  <!-- WORKOUTS -->
+  <section class="panel" id="tab-workouts" hidden>
+    <div class="card">
+      <div class="row between"><h2>This week</h2><span class="pill accent" id="woStreak">—</span></div>
+      <div class="stats">
+        <div class="stat"><b id="woWeek">0</b><span>Workouts</span></div>
+        <div class="stat"><b id="woSets">0</b><span>Sets</span></div>
+        <div class="stat"><b id="woMin">0</b><span>Cardio min</span></div>
+      </div>
+      <svg class="chart" id="woChart" viewBox="0 0 600 120" role="img" aria-label="Workouts per week for the last 8 weeks"></svg>
+    </div>
+
+    <div class="card" id="woCard">
+      <div class="row between"><h2 id="woFormTitle">Log a workout</h2><button class="ghost" type="button" id="woClear" hidden>Clear</button></div>
+      <div class="seg" id="woKind" role="group" aria-label="Workout type">
+        <button type="button" data-kind="strength" aria-pressed="true">Strength</button>
+        <button type="button" data-kind="cardio" aria-pressed="false">Cardio</button>
+      </div>
+      <form class="add" id="woForm" autocomplete="off">
+        <label class="f" for="woDate">Date<input id="woDate" type="date" required></label>
+        <label class="f" for="woTitle">Name<input id="woTitle" type="text" maxlength="60" placeholder="Push day" list="woTitles"></label>
+        <datalist id="woTitles"></datalist>
+        <datalist id="exNames"></datalist>
+
+        <div class="full" id="strengthBox" style="display:flex;flex-direction:column;gap:10px">
+          <div id="exList" style="display:flex;flex-direction:column;gap:10px"></div>
+          <button class="ghost" type="button" id="addEx" style="align-self:flex-start">+ Add Exercise</button>
+        </div>
+
+        <div class="full" id="cardioBox" hidden>
+          <div class="add" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <label class="f full" for="cAct">Activity<select id="cAct"><option>Run</option><option>Walk</option><option>Bike</option><option>Elliptical</option><option>Stair climber</option><option>Rowing</option><option>Swim</option><option>Sports</option><option>Other</option></select></label>
+            <label class="f" for="cMin">Minutes<input id="cMin" type="number" min="0" step="1" inputmode="decimal" placeholder="30"></label>
+            <label class="f" for="cDist"><span>Distance (<span class="distUnit">mi</span>)</span><input id="cDist" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Optional"></label>
+          </div>
+        </div>
+        <label class="f" for="woCal">Calories burned<input id="woCal" type="number" min="0" step="1" inputmode="decimal" placeholder="Optional"></label>
+        <label class="f" for="woNote">Notes<input id="woNote" type="text" maxlength="200" placeholder="Optional"></label>
+        <button class="primary full" type="submit" id="woSubmit">Save Workout</button>
+      </form>
+    </div>
+
+    <div class="card" id="prCard">
+      <h2>Personal bests</h2>
+      <ul class="list" id="prList"></ul>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <div class="wolist" id="woList"></div>
+    </div>
+  </section>
+
+  <!-- WEIGHT -->
+  <section class="panel" id="tab-weight" hidden>
+    <div class="card">
+      <div class="row between"><span class="eyebrow">Current weight</span><span class="pill" id="wTrend">—</span></div>
+      <div class="big" id="wNow">—</div>
+      <div class="stats">
+        <div class="stat"><b id="wStart">—</b><span>Starting</span></div>
+        <div class="stat"><b id="wChange">—</b><span>Change</span></div>
+        <div class="stat"><b id="wToGoal">—</b><span>To goal</span></div>
+      </div>
+      <div id="wGoalBarWrap"><div class="bar"><i id="wGoalBar" style="width:0%"></i></div><div class="foot" id="wGoalText" style="margin-top:6px"></div></div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><h2>Progress</h2>
+        <div class="seg small" id="wRange" role="group" aria-label="Chart range" style="min-width:180px">
+          <button type="button" data-range="30" aria-pressed="false">1M</button>
+          <button type="button" data-range="90" aria-pressed="true">3M</button>
+          <button type="button" data-range="365" aria-pressed="false">1Y</button>
+          <button type="button" data-range="0" aria-pressed="false">All</button>
+        </div>
+      </div>
+      <svg class="chart" id="wChart" viewBox="0 0 600 220" role="img" aria-label="Weight over time"></svg>
+      <div class="legend"><span><i></i>7-day average</span><span><i style="background:var(--faint);height:6px;width:6px;border-radius:50%"></i>Weigh-ins</span><span id="wGoalLegend"><i style="background:var(--good)"></i>Goal</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Log weight</h2>
+      <form class="add" id="wForm">
+        <label class="f" for="wVal"><span>Weight (<span class="wUnit">lb</span>)</span><input id="wVal" type="number" min="0" step="0.1" inputmode="decimal" placeholder="180.0" required></label>
+        <label class="f" for="wDate">Date<input id="wDate" type="date" required></label>
+        <button class="primary full" type="submit">Save Weight</button>
+      </form>
+      <div class="foot">One weigh-in per day. Saving again for the same day replaces it. Weigh at the same time each day (morning works best).</div>
+    </div>
+
+    <div class="card">
+      <h2>History</h2>
+      <ul class="list" id="wList"></ul>
+      <button class="ghost" type="button" id="wMore" hidden style="align-self:flex-start">Show All</button>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="panel" id="tab-settings" hidden>
+    <div class="card">
+      <h2>Daily goals</h2>
+      <form class="add" id="goalForm">
+        <label class="f full" for="gCal">Calories<input id="gCal" type="number" min="0" step="10" inputmode="decimal" placeholder="2200"></label>
+        <label class="f" for="gP">Protein g<input id="gP" type="number" min="0" step="1" inputmode="decimal" placeholder="160"></label>
+        <label class="f" for="gC">Carbs g<input id="gC" type="number" min="0" step="1" inputmode="decimal" placeholder="220"></label>
+        <label class="f" for="gF">Fat g<input id="gF" type="number" min="0" step="1" inputmode="decimal" placeholder="70"></label>
+        <label class="f" for="gW"><span>Goal weight (<span class="wUnit">lb</span>)</span><input id="gW" type="number" min="0" step="0.5" inputmode="decimal" placeholder="Optional"></label>
+        <label class="f full" for="gSteps">Steps<input id="gSteps" type="number" min="0" step="500" inputmode="numeric" placeholder="10000"></label>
+        <label class="check full"><input type="checkbox" id="gBurn">Add workout calories burned to my daily calorie goal</label>
+        <div class="foot full" id="macroCheck"></div>
+        <button class="primary full" type="submit">Save Goals</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="row between"><h2>Apple Health steps</h2><span class="pill" id="hkStatus">Not set up</span></div>
+      <div class="foot">Websites can't read Apple Health directly, so an iPhone Shortcut reads your steps from Health and sends them here. It runs on its own at the times you pick. Full steps are in the README ("Apple Health steps").</div>
+      <div class="foot">The Shortcut needs these three values. Copy each one into the matching spot.</div>
+      <ul class="list">
+        <li><div class="grow"><div>Web API key</div><div class="sub" id="hkKey" style="word-break:break-all"></div></div><button class="ghost" type="button" data-copy="key">Copy</button></li>
+        <li><div class="grow"><div>Project ID</div><div class="sub" id="hkProj" style="word-break:break-all"></div></div><button class="ghost" type="button" data-copy="proj">Copy</button></li>
+        <li><div class="grow"><div>Steps key</div><div class="sub">Private. Works like a password for your fitness data.</div></div><button class="ghost" type="button" data-copy="token">Copy</button></li>
+      </ul>
+      <div class="foot">If you ever think the steps key got out, change your password below. That turns off the old key; then copy the new one into the Shortcut.</div>
+    </div>
+
+    <div class="card">
+      <div class="row between"><h2>Goal calculator</h2><button class="ghost" type="button" id="calcToggle">Open</button></div>
+      <div id="calcBox" hidden style="display:flex;flex-direction:column;gap:12px">
+        <div class="foot">Estimates your daily calories with the Mifflin-St Jeor formula, then splits them into macros. It's a starting point: after 2–3 weeks, compare it with your weight trend and adjust by 100–200 calories.</div>
+        <div class="seg" id="cSex" role="group" aria-label="Sex">
+          <button type="button" data-sex="m" aria-pressed="true">Male</button>
+          <button type="button" data-sex="f" aria-pressed="false">Female</button>
+        </div>
+        <div class="add" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <label class="f" for="cAge">Age<input id="cAge" type="number" min="14" max="99" inputmode="numeric" placeholder="30"></label>
+          <label class="f" for="cWeight"><span>Weight (<span class="wUnit">lb</span>)</span><input id="cWeight" type="number" min="0" step="0.1" inputmode="decimal"></label>
+          <label class="f" for="cFt" id="cHtLabel">Height<span class="row" style="flex-wrap:nowrap;gap:8px"><input id="cFt" type="number" min="3" max="8" inputmode="numeric" placeholder="5 ft"><input id="cIn" type="number" min="0" max="11.9" step="0.5" inputmode="decimal" placeholder="10 in"></span></label>
+          <label class="f" for="cCm" id="cCmLabel" hidden>Height (cm)<input id="cCm" type="number" min="100" max="250" inputmode="decimal" placeholder="178"></label>
+          <label class="f" for="cActv">Activity<select id="cActv">
+            <option value="1.2">Mostly sitting</option>
+            <option value="1.375" selected>Light (1–3 workouts/wk)</option>
+            <option value="1.55">Moderate (3–5/wk)</option>
+            <option value="1.725">Very active (6–7/wk)</option>
+          </select></label>
+          <label class="f full" for="cPace">Goal<select id="cPace">
+            <option value="-500">Lose about 1 lb a week</option>
+            <option value="-250" selected>Lose about ½ lb a week</option>
+            <option value="0">Maintain</option>
+            <option value="250">Gain about ½ lb a week</option>
+          </select></label>
+        </div>
+        <button class="ghost" type="button" id="calcRun" style="align-self:flex-start">Calculate</button>
+        <div class="notice" id="calcOut" hidden></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Units</h2>
+      <div class="seg" id="unitSeg" role="group" aria-label="Units">
+        <button type="button" data-unit="lb" aria-pressed="true">Pounds · miles</button>
+        <button type="button" data-unit="kg" aria-pressed="false">Kilograms · km</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Appearance</h2>
+      <div class="seg" id="themeSeg" role="group" aria-label="Appearance">
+        <button type="button" data-theme-choice="system" aria-pressed="true">Automatic</button>
+        <button type="button" data-theme-choice="light" aria-pressed="false">Light</button>
+        <button type="button" data-theme-choice="dark" aria-pressed="false">Dark</button>
+      </div>
+      <div class="foot">Automatic follows your phone's Light or Dark setting.</div>
+    </div>
+
+    <div class="card">
+      <h2>Backup</h2>
+      <div class="row">
+        <button class="ghost" type="button" id="exportBtn">Download Backup</button>
+        <button class="ghost" type="button" id="importBtn">Restore From Backup</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+      <div class="foot">Everything is saved to your account automatically and syncs across your devices. A backup file is an extra copy you can keep.</div>
+    </div>
+
+    <div class="card">
+      <h2>Account</h2>
+      <div class="foot" id="acctEmail"></div>
+      <form class="row" id="pwForm">
+        <input id="newPw" type="password" minlength="6" autocomplete="new-password" placeholder="New password" aria-label="New password" required style="flex:1;min-width:180px">
+        <button class="ghost" type="submit">Change</button>
+      </form>
+      <button class="ghost destructive" type="button" id="signOut" style="align-self:flex-start">Sign Out</button>
+      <div class="foot">Tip: in Safari tap Share, then <b>Add to Home Screen</b> to open this like an app.</div>
+    </div>
+  </section>
+
+  <nav class="tabs" role="tablist" id="tabs" aria-label="Sections"></nav>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
